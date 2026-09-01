@@ -19,7 +19,7 @@ export default function LostModeToggle({
 
   async function toggleLost() {
     setLoading(true);
-    const nextStatus = isLost ? "normal" : "lost";
+    const nextStatus: Pet["status"] = isLost ? "normal" : "lost";
 
     const updates = {
       status: nextStatus,
@@ -30,7 +30,13 @@ export default function LostModeToggle({
     };
 
     await updateDoc(doc(db, "pets", pet.id), updates);
-    onUpdate({ ...pet, ...updates, lostSince: updates.lostSince } as Pet);
+    onUpdate({
+      ...pet,
+      status: nextStatus,
+      lostSince: updates.lostSince,
+      rewardNote: updates.rewardNote,
+      lastSeenLocation: updates.lastSeenLocation,
+    });
 
     // Fire a community broadcast alert when a pet goes lost
     if (nextStatus === "lost") {
