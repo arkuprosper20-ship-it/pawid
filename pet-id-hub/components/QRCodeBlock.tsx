@@ -1,6 +1,7 @@
 "use client";
 
 import { QRCodeCanvas } from "qrcode.react";
+import { useState } from "react";
 import { siteUrl } from "@/lib/firebase";
 
 export default function QRCodeBlock({
@@ -10,7 +11,23 @@ export default function QRCodeBlock({
   petId: string;
   petName: string;
 }) {
+  const [copied, setCopied] = useState(false);
   const publicUrl = `${siteUrl}/pets/${petId}`;
+
+  async function copyUrl() {
+    await navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+
+  function downloadQr() {
+    const canvas = document.getElementById(`qr-${petId}`) as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `${petName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-pawid-qr.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }
 
   function printTag() {
     const printWindow = window.open("", "_blank", "width=400,height=500");
@@ -46,8 +63,16 @@ export default function QRCodeBlock({
         includeMargin
       />
       <p className="text-xs text-gray-500 break-all text-center">{publicUrl}</p>
-      <button onClick={printTag} className="btn-secondary text-sm w-full">
-        🖨️ Print QR collar tag
+      <div className="grid grid-cols-2 gap-2 w-full">
+        <button onClick={copyUrl} className="btn-secondary text-sm">
+          {copied ? "Copied" : "Copy link"}
+        </button>
+        <button onClick={downloadQr} className="btn-secondary text-sm">
+          Download QR
+        </button>
+      </div>
+      <button onClick={printTag} className="btn-primary text-sm w-full">
+        Print QR collar tag
       </button>
     </div>
   );

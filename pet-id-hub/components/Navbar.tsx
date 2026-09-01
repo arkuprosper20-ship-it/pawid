@@ -35,6 +35,9 @@ export default function Navbar() {
               <Link href="/dashboard" className="hover:text-brand-600">
                 My Pets
               </Link>
+              <Link href="/admin" className="hover:text-brand-600">
+                Admin
+              </Link>
               <button onClick={signOut} className="text-gray-400 hover:text-gray-700">
                 Sign out
               </button>
