@@ -1,0 +1,86 @@
+rules_version = '2';
+
+// =========================================================
+// Pet ID & Community Hub — Firestore Security Rules
+// Deploy: Firebase Console > Firestore Database > Rules (paste this in),
+// or `firebase deploy --only firestore:rules` with the Firebase CLI.
+// =========================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function isPetOwner(petId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/pets/$(petId)).data.ownerId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------
+    // PROFILES — readable by everyone (needed for community feed
+    // author names before we denormalize), editable only by self or admin.
+    // ---------------------------------------------------------
+    match /profiles/{userId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // ---------------------------------------------------------
+    // PETS — publicly readable (this is what makes the QR landing
+    // page work with no login). Only the owner (or an admin) can write.
+    // ---------------------------------------------------------
+    match /pets/{petId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid || isAdmin());
+    }
+
+    // ---------------------------------------------------------
+    // HEALTH LOGS — private to the pet's owner (medical privacy)
+    // ---------------------------------------------------------
+    match /healthLogs/{logId} {
+      allow create: if isPetOwner(request.resource.data.petId);
+      allow read, update, delete: if isPetOwner(resource.data.petId) || isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // QR SCANS — anyone (including anonymous finders) can log a scan
+    // or send a message. Only the pet's owner (or admin) can read them.
+    // ---------------------------------------------------------
+    match /qrScans/{scanId} {
+      allow create: if true;
+      allow read: if isPetOwner(resource.data.petId) || isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // COMMUNITY POSTS — signed-in users can read non-removed posts
+    // (or their own removed ones), create their own, flag/edit their own.
+    // ---------------------------------------------------------
+    match /communityPosts/{postId} {
+      allow read: if isSignedIn() &&
+        (resource.data.isRemoved == false || resource.data.authorId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (resource.data.authorId == request.auth.uid || isAdmin());
+    }
+
+    // ---------------------------------------------------------
+    // BROADCAST ALERTS — publicly readable, any signed-in user can
+    // trigger one (auto-fired from Lost Mode) or an admin manually.
+    // ---------------------------------------------------------
+    match /broadcastAlerts/{alertId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+    }
+  }
+}

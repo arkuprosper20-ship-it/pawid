@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gray-50 text-gray-900;
+}
+
+.card {
+  @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-5;
+}
+
+.btn-primary {
+  @apply bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-xl transition-colors;
+}
+
+.btn-secondary {
+  @apply bg-white hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-xl border border-gray-200 transition-colors;
+}
+
+.btn-alert {
+  @apply bg-alert-500 hover:bg-alert-600 text-white font-medium px-4 py-2 rounded-xl transition-colors;
+}
+
+.badge-pill {
+  @apply inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full;
+}
+
+.input-field {
+  @apply w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400;
+}
