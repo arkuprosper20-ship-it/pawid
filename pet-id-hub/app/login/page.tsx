@@ -25,7 +25,11 @@ export default function LoginPage() {
       window.localStorage.setItem("pawid_email_for_signin", email);
       setSent(true);
     } catch (err: any) {
-      setError(err.message || "Something went wrong sending the link.");
+      setError(
+        err.code === "auth/configuration-not-found"
+          ? "Email link sign-in is not enabled for this Firebase project. Enable Authentication, then the Email link provider in Firebase Console."
+          : err.message || "Something went wrong sending the link."
+      );
     }
     setLoading(false);
   }
