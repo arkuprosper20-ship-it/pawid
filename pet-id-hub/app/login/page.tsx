@@ -36,16 +36,36 @@ export default function LoginPage() {
 
   return (
     <div className="max-w-sm mx-auto mt-12">
-      <div className="card">
-        <h1 className="text-xl font-bold mb-1">Sign in to PawID</h1>
+      <div className="card border-brand-100 shadow-lg shadow-brand-900/5">
+        <p className="page-kicker mb-2">Welcome back</p>
+        <h1 className="section-heading text-[1.8rem] mb-2">Sign in to PawID</h1>
         <p className="text-sm text-gray-500 mb-6">
           No password needed — we'll email you a magic link.
         </p>
 
         {sent ? (
           <div className="bg-brand-50 text-brand-700 text-sm rounded-xl p-4">
-            Check your inbox! Click the link we sent to <strong>{email}</strong>{" "}
-            to finish signing in.
+            <p>
+              Sign-in link requested for <strong>{email}</strong>. Check your
+              inbox and spam folder for an email from Firebase, then click the
+              link on this device.
+            </p>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                className="font-semibold underline"
+                onClick={() => setSent(false)}
+              >
+                Use another email
+              </button>
+              <button
+                type="button"
+                className="font-semibold underline"
+                onClick={() => handleSubmit({ preventDefault() {} } as React.FormEvent)}
+              >
+                Resend link
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
