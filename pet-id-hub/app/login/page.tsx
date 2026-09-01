@@ -47,8 +47,13 @@ export default function LoginPage() {
           <div className="bg-brand-50 text-brand-700 text-sm rounded-xl p-4">
             <p>
               Sign-in link requested for <strong>{email}</strong>. Check your
-              inbox and spam folder for an email from Firebase, then click the
-              link on this device.
+              inbox, then check Spam, Junk, or Promotions for an email from
+              Firebase. You can also search your mailbox for “PawID” or
+              “Firebase”. When you find it, click the link on this device.
+            </p>
+            <p className="mt-3 text-xs text-brand-700/80">
+              Still not there after a few minutes? Use <strong>Resend link</strong>
+              or try another email address.
             </p>
             <div className="mt-4 flex gap-3">
               <button
