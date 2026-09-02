@@ -30,8 +30,16 @@ service cloud.firestore {
     // ---------------------------------------------------------
     match /profiles/{userId} {
       allow read: if true;
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Profiles must always begin as non-admin. Administrator access is
+      // granted only through a trusted server-side workflow.
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+        request.resource.data.isAdmin == false;
+      // A user may update their own profile, but may not grant themselves
+      // administrator access. Only an existing admin can change isAdmin.
+      allow update: if isSignedIn() &&
+        (isAdmin() ||
+          (request.auth.uid == userId &&
+           request.resource.data.isAdmin == resource.data.isAdmin));
     }
 
     // ---------------------------------------------------------

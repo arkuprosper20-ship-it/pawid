@@ -1,10 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
   title: "PawID — Pet ID & Community Hub",
   description: "QR pet tags, lost & found alerts, and a community hub for pet owners.",
+  robots: { index: true, follow: true },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#f5f2ec",
 };
 
 export default function RootLayout({

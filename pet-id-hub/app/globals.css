@@ -7,6 +7,21 @@ body {
   background: #f5f2ec;
 }
 
+/* Keep keyboard focus visible across interactive controls. */
+:focus-visible {
+  outline: 3px solid #17734e;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .home-shell { max-width: 1120px; margin: 0 auto; }
 .home-hero { min-height: 650px; display: grid; grid-template-columns: 1fr 0.9fr; align-items: center; gap: 5rem; padding: 4rem 1rem 5rem; }
 .hero-copy { animation: rise-in 700ms ease-out both; }

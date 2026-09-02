@@ -77,12 +77,13 @@ export default function LoginPage() {
             <input
               type="email"
               required
+              aria-label="Email address"
               placeholder="you@example.com"
               className="input-field"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            {error && <p className="text-alert-500 text-sm">{error}</p>}
+            {error && <p role="alert" className="text-alert-500 text-sm">{error}</p>}
             <button type="submit" disabled={loading} className="btn-primary w-full">
               {loading ? "Sending..." : "Send magic link"}
             </button>

@@ -151,6 +151,7 @@ export default function PublicPetPage() {
             <form onSubmit={sendFinderMessage} className="space-y-2 mt-3">
               <textarea
                 required
+                aria-label="Where did you find the pet?"
                 placeholder="Where did you find them? Any details help."
                 className="input-field text-sm"
                 rows={2}
@@ -158,13 +159,14 @@ export default function PublicPetPage() {
                 onChange={(e) => setFinderMsg(e.target.value)}
               />
               <input
+                aria-label="Your contact phone or email"
                 placeholder="Your phone or email (optional)"
                 className="input-field text-sm"
                 value={finderContact}
                 onChange={(e) => setFinderContact(e.target.value)}
               />
               <button type="submit" className="btn-alert w-full text-sm">
-                📍 Send location &amp; notify owner
+                📍 Send location & notify owner
               </button>
             </form>
           )}
@@ -185,7 +187,13 @@ export default function PublicPetPage() {
           Upload a photo and compare it by eye against pets currently reported
           lost nearby.
         </p>
-        <input type="file" accept="image/*" onChange={handlePhotoUpload} className="text-sm" />
+        <input
+          type="file"
+          accept="image/*"
+          aria-label="Upload a photo of the stray pet"
+          onChange={handlePhotoUpload}
+          className="text-sm"
+        />
 
         {showCompare && (
           <div className="mt-3">

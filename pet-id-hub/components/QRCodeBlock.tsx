@@ -42,7 +42,7 @@ export default function QRCodeBlock({
         <head><title>${petName} — QR Tag</title></head>
         <body style="text-align:center; font-family: sans-serif; padding: 24px;">
           <div style="border: 2px dashed #999; border-radius: 16px; padding: 24px; display: inline-block;">
-            <img src="${dataUrl}" width="180" height="180" />
+            <img src="${dataUrl}" width="180" height="180" alt="QR code for ${petName}'s PawID profile" />
             <h2 style="margin: 8px 0 0;">${petName}</h2>
             <p style="color:#666; font-size: 12px;">Scan if found — PawID</p>
           </div>
@@ -64,14 +64,14 @@ export default function QRCodeBlock({
       />
       <p className="text-xs text-gray-500 break-all text-center">{publicUrl}</p>
       <div className="grid grid-cols-2 gap-2 w-full">
-        <button onClick={copyUrl} className="btn-secondary text-sm">
+        <button onClick={copyUrl} className="btn-secondary text-sm" aria-label="Copy public pet profile link">
           {copied ? "Copied" : "Copy link"}
         </button>
-        <button onClick={downloadQr} className="btn-secondary text-sm">
+        <button onClick={downloadQr} className="btn-secondary text-sm" aria-label="Download QR code image">
           Download QR
         </button>
       </div>
-      <button onClick={printTag} className="btn-primary text-sm w-full">
+      <button onClick={printTag} className="btn-primary text-sm w-full" aria-label="Print QR collar tag">
         Print QR collar tag
       </button>
     </div>

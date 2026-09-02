@@ -20,6 +20,8 @@ export interface Pet {
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
   microchipId: string | null;
+  /** Owner-provided ID shown on the pet record (for example, a collar tag number). */
+  petIdentifier?: string | null;
   status: PetStatus;
   lostSince: string | null;
   rewardNote: string | null;

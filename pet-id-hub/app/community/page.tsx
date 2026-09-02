@@ -24,6 +24,7 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [alerts, setAlerts] = useState<BroadcastAlert[]>([]);
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -80,8 +81,14 @@ export default function CommunityPage() {
   }
 
   async function flagPost(postId: string) {
-    await updateDoc(doc(db, "communityPosts", postId), { isFlagged: true });
-    load();
+    setReportStatus(null);
+    try {
+      await updateDoc(doc(db, "communityPosts", postId), { isFlagged: true });
+      setReportStatus("Thanks — this post has been reported and flagged for review.");
+      load();
+    } catch (err: any) {
+      setReportStatus(err.message || "Could not report this post. Try again.");
+    }
   }
 
   return (
@@ -104,6 +111,7 @@ export default function CommunityPage() {
       <form onSubmit={submitPost} className="card mb-6">
         <textarea
           required
+          aria-label="Community post content"
           placeholder="Share an update, ask a question..."
           className="input-field text-sm"
           rows={3}
@@ -114,6 +122,10 @@ export default function CommunityPage() {
           {posting ? "Posting..." : "Post"}
         </button>
       </form>
+
+      {reportStatus && (
+        <p role="status" className="text-sm text-brand-700 mb-4">{reportStatus}</p>
+      )}
 
       {loading ? (
         <p className="text-gray-400">Loading feed...</p>

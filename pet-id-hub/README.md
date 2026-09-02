@@ -119,6 +119,9 @@ retry. Details in `firebase/data-model.md`.
 | Firestore + Storage security rules | `firebase/firestore.rules`, `firebase/storage.rules` |
 | Data model reference (Firestore is schemaless) | `firebase/data-model.md` |
 
+## deployment url
+https://pet-id-hub.vercel.app/
+
 **Why no AI, and why it doesn't hurt the demo:**
 - The "visual verification" feature is a manual side-by-side photo grid —
   a finder uploads a photo and compares it by eye against currently-lost

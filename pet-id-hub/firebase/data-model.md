@@ -34,6 +34,7 @@ medicalNotes: string | null
 emergencyContactName: string | null
 emergencyContactPhone: string | null
 microchipId: string | null
+petIdentifier: string | null // owner-provided collar tag or pet ID number
 status: "normal" | "lost"
 lostSince: string | null       // ISO timestamp
 rewardNote: string | null

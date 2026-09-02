@@ -75,6 +75,11 @@ export default function PetDetailPage() {
               <strong>Microchip ID:</strong> {pet.microchipId}
             </p>
           )}
+          {pet.petIdentifier && (
+            <p className="text-sm text-gray-600 mt-1">
+              <strong>Pet ID / tag number:</strong> {pet.petIdentifier}
+            </p>
+          )}
         </div>
 
         <LostModeToggle pet={pet} onUpdate={setPet} />
@@ -87,6 +92,7 @@ export default function PetDetailPage() {
         <a
           href={`/pets/${pet.id}`}
           target="_blank"
+          rel="noopener noreferrer"
           className="btn-secondary block text-center text-sm"
         >
           View public profile ↗

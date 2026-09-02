@@ -65,12 +65,17 @@ export default function CompleteSignInPage() {
           <input
             type="email"
             required
+            aria-label="Email address used to sign in"
             placeholder="you@example.com"
             className="input-field mb-3"
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
           />
-          <button className="btn-primary w-full" onClick={() => finishSignIn(emailInput)}>
+          <button
+            type="button"
+            className="btn-primary w-full"
+            onClick={() => finishSignIn(emailInput)}
+          >
             Continue
           </button>
           {error && <p className="text-alert-500 text-sm mt-2">{error}</p>}

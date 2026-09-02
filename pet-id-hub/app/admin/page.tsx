@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   query,
@@ -19,6 +21,7 @@ import { auth, db, toJsDate } from "@/lib/firebase";
 import { Pet, CommunityPost } from "@/types";
 
 export default function AdminPage() {
+  const router = useRouter();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
@@ -29,26 +32,29 @@ export default function AdminPage() {
     totalUsers: 0,
   });
   const [broadcastMsg, setBroadcastMsg] = useState("");
+  const [broadcastStatus, setBroadcastStatus] = useState<string | null>(null);
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
   useEffect(() => {
-    checkAdminAndLoad();
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+      checkAdminAndLoad(user.uid);
+    });
+    return () => unsubscribe();
+  }, [router]);
 
-  async function checkAdminAndLoad() {
-    const user = auth.currentUser;
-    if (!user) {
-      window.location.href = "/login";
-      return;
-    }
-    const profileSnap = await getDoc(doc(db, "profiles", user.uid));
-    if (!profileSnap.exists() || !profileSnap.data().isAdmin) {
-      setAuthorized(false);
+  async function checkAdminAndLoad(uid: string) {
+    const profileSnap = await getDoc(doc(db, "profiles", uid));
+    if (!profileSnap.exists() || profileSnap.data().isAdmin !== true) {
+      router.replace("/dashboard");
       return;
     }
     setAuthorized(true);
     loadData();
   }
-
   async function loadData() {
     const petsSnap = await getDocs(
       query(collection(db, "pets"), orderBy("createdAt", "desc"))
@@ -83,27 +89,26 @@ export default function AdminPage() {
 
   async function triggerBroadcast(e: React.FormEvent) {
     e.preventDefault();
-    await addDoc(collection(db, "broadcastAlerts"), {
-      petId: null,
-      message: broadcastMsg,
-      triggeredBy: auth.currentUser?.uid || null,
-      isManual: true,
-      createdAt: serverTimestamp(),
-    });
-    setBroadcastMsg("");
-    alert("Broadcast sent to community feed.");
+    setSendingBroadcast(true);
+    setBroadcastStatus(null);
+    try {
+      await addDoc(collection(db, "broadcastAlerts"), {
+        petId: null,
+        message: broadcastMsg,
+        triggeredBy: auth.currentUser?.uid || null,
+        isManual: true,
+        createdAt: serverTimestamp(),
+      });
+      setBroadcastMsg("");
+      setBroadcastStatus("Broadcast sent to community feed.");
+    } catch (err: any) {
+      setBroadcastStatus(err.message || "Could not send broadcast. Try again.");
+    }
+    setSendingBroadcast(false);
   }
 
   if (authorized === null) return <p className="text-gray-400">Checking access...</p>;
-  if (authorized === false)
-    return (
-      <div className="card max-w-md mx-auto text-center py-10">
-        <p className="text-alert-500 font-medium">Admin access only.</p>
-        <p className="text-sm text-gray-500 mt-1">
-          Ask a project admin to set <code>isAdmin: true</code> on your profile document.
-        </p>
-      </div>
-    );
+  if (authorized === false) return null;
 
   return (
     <div>
@@ -121,13 +126,30 @@ export default function AdminPage() {
         <form onSubmit={triggerBroadcast} className="flex gap-2">
           <input
             required
+            aria-label="Message to broadcast to all users"
             placeholder="Message to broadcast to all users..."
             className="input-field text-sm"
             value={broadcastMsg}
             onChange={(e) => setBroadcastMsg(e.target.value)}
           />
-          <button className="btn-alert text-sm whitespace-nowrap">Send alert</button>
+          <button
+            type="submit"
+            disabled={sendingBroadcast}
+            className="btn-alert text-sm whitespace-nowrap"
+          >
+            {sendingBroadcast ? "Sending..." : "Send alert"}
+          </button>
         </form>
+        {broadcastStatus && (
+          <p
+            role="status"
+            className={`text-sm mt-2 ${
+              broadcastStatus.startsWith("Could") ? "text-alert-500" : "text-brand-700"
+            }`}
+          >
+            {broadcastStatus}
+          </p>
+        )}
       </div>
 
       <div className="card mb-8 overflow-x-auto">

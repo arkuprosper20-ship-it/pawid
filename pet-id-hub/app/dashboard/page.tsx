@@ -46,8 +46,16 @@ export default function DashboardPage() {
       </div>
 
       {pets.length === 0 ? (
-        <div className="card text-center py-12 text-gray-500">
-          No pets yet. Add your first pet to generate their QR ID tag.
+        <div className="card text-center py-14">
+          <div className="text-5xl mb-4" aria-hidden="true">🐾</div>
+          <h2 className="text-xl font-semibold mb-2">No pets yet</h2>
+          <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+            Add your first pet to generate their QR ID tag and keep their
+            important details one scan away.
+          </p>
+          <Link href="/dashboard/pets/new" className="btn-primary inline-flex">
+            + Add your first pet
+          </Link>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">

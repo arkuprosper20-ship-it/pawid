@@ -3,14 +3,26 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 export default function Navbar() {
-  const [email, setEmail] = useState<string | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setEmail(user?.email ?? null);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setIsSignedIn(Boolean(user));
+      setIsAdmin(false);
+      if (!user) return;
+
+      try {
+        const profile = await getDoc(doc(db, "profiles", user.uid));
+        setIsAdmin(profile.exists() && profile.data().isAdmin === true);
+      } catch {
+        // If the profile cannot be read, never expose the admin navigation.
+        setIsAdmin(false);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -26,19 +38,21 @@ export default function Navbar() {
         <Link href="/" className="font-bold text-lg text-brand-700">
           🐾 PawID
         </Link>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-3 sm:gap-4 text-sm">
           <Link href="/community" className="hover:text-brand-600">
             Community
           </Link>
-          {email ? (
+          {isSignedIn ? (
             <>
               <Link href="/dashboard" className="hover:text-brand-600">
                 My Pets
               </Link>
-              <Link href="/admin" className="hover:text-brand-600">
-                Admin
-              </Link>
-              <button onClick={signOut} className="text-gray-400 hover:text-gray-700">
+              {isAdmin && (
+                <Link href="/admin" className="hover:text-brand-600">
+                  Admin
+                </Link>
+              )}
+              <button type="button" onClick={signOut} className="text-gray-400 hover:text-gray-700">
                 Sign out
               </button>
             </>

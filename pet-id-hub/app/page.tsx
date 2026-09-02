@@ -12,7 +12,7 @@ export default function Home() {
             direct line back to you.
           </p>
           <div className="hero-actions">
-            <Link href="/login" className="btn-primary">Create your pet ID <span aria-hidden="true">↗</span></Link>
+            <Link href="/dashboard/pets/new" className="btn-primary">Create your pet ID <span aria-hidden="true">↗</span></Link>
             <Link href="/community" className="text-link">Explore the community <span aria-hidden="true">→</span></Link>
           </div>
           <div className="hero-proof">
