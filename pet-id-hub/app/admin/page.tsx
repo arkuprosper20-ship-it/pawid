@@ -19,13 +19,14 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db, toJsDate } from "@/lib/firebase";
-import { Pet, CommunityPost } from "@/types";
+import { Pet, CommunityPost, BroadcastAlert } from "@/types";
 
 export default function AdminPage() {
   const router = useRouter();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [alerts, setAlerts] = useState<BroadcastAlert[]>([]);
   const [stats, setStats] = useState({
     totalPets: 0,
     lostPets: 0,
@@ -58,12 +59,14 @@ export default function AdminPage() {
   }
   async function loadData() {
     try {
-      const [petsSnap, postsSnap] = await Promise.all([
+      const [petsSnap, postsSnap, alertsSnap] = await Promise.all([
         getDocs(query(collection(db, "pets"), orderBy("createdAt", "desc"), limit(100))),
         getDocs(query(collection(db, "communityPosts"), orderBy("createdAt", "desc"), limit(50))),
+        getDocs(query(collection(db, "broadcastAlerts"), orderBy("createdAt", "desc"), limit(20))),
       ]);
       setPets(petsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Pet));
       setPosts(postsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as CommunityPost));
+      setAlerts(alertsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as BroadcastAlert)));
 
       let totalPets = 0;
       let lostPets = 0;
@@ -116,6 +119,15 @@ export default function AdminPage() {
       await updateDoc(doc(db, "communityPosts", postId), { isRemoved: true });
     }
     loadData();
+  }
+
+  async function deleteAlert(alertId: string) {
+    try {
+      await deleteDoc(doc(db, "broadcastAlerts", alertId));
+      setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+    } catch (err: any) {
+      setBroadcastStatus(err.message || "Could not delete alert.");
+    }
   }
 
   function displayAuthor(post: CommunityPost): string {
@@ -188,6 +200,34 @@ export default function AdminPage() {
             {broadcastStatus}
           </p>
         )}
+      </div>
+
+      <div className="card mb-8 overflow-x-auto">
+        <h2 className="font-semibold mb-3">Broadcast alerts</h2>
+        <div className="space-y-2">
+          {alerts.length === 0 ? (
+            <p className="text-sm text-gray-400">No alerts yet.</p>
+          ) : (
+            alerts.map((a) => (
+              <div key={a.id} className="flex justify-between items-start border-b border-gray-50 pb-2">
+                <div className="min-w-0 flex-1 pr-3">
+                  <p className="text-sm break-words">{a.message}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {toJsDate(a.createdAt).toLocaleString()}
+                    {a.isManual ? " · Manual" : " · Automatic"}
+                    {a.petId ? ` · Pet: ${a.petId}` : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => deleteAlert(a.id)}
+                  className="text-xs text-alert-500 hover:underline whitespace-nowrap ml-3"
+                >
+                  Delete
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       <div className="card mb-8 overflow-x-auto">
