@@ -41,7 +41,7 @@ export default function PetDetailPage() {
     try {
       const snap = await getDoc(doc(db, "pets", id));
       if (snap.exists()) {
-        const data = snap.data() as Pet;
+        const data = snap.data() as Omit<Pet, "id">;
         setPet({ id: snap.id, ...data });
         setForm({
           name: data.name || "",
