@@ -31,61 +31,76 @@ export default function CommunityPage() {
   }, []);
 
   async function load() {
-    const postsQ = query(
-      collection(db, "communityPosts"),
-      where("isRemoved", "==", false),
-      orderBy("createdAt", "desc"),
-      limit(30)
-    );
-    const postsSnap = await getDocs(postsQ);
-    setPosts(postsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as CommunityPost));
+    try {
+      const postsQ = query(
+        collection(db, "communityPosts"),
+        where("isRemoved", "==", false),
+        orderBy("createdAt", "desc"),
+        limit(50)
+      );
+      const postsSnap = await getDocs(postsQ);
+      const postsList = postsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as CommunityPost));
+      setPosts(postsList);
 
-    const alertsQ = query(
-      collection(db, "broadcastAlerts"),
-      orderBy("createdAt", "desc"),
-      limit(3)
-    );
-    const alertsSnap = await getDocs(alertsQ);
-    setAlerts(alertsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as BroadcastAlert));
-
-    setLoading(false);
+      const alertsQ = query(
+        collection(db, "broadcastAlerts"),
+        orderBy("createdAt", "desc"),
+        limit(10)
+      );
+      const alertsSnap = await getDocs(alertsQ);
+      setAlerts(alertsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as BroadcastAlert)));
+    } catch (err) {
+      console.error("Failed to load community feed:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function submitPost(e: React.FormEvent) {
     e.preventDefault();
+    if (!content.trim()) return;
     setPosting(true);
-    const user = auth.currentUser;
-    if (!user) {
-      window.location.href = "/login";
-      return;
+    setReportStatus(null);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        setReportStatus("You must be signed in to post.");
+        setPosting(false);
+        return;
+      }
+      let authorName = user.email || "Pet Parent";
+      try {
+        const profileSnap = await getDoc(doc(db, "profiles", user.uid));
+        if (profileSnap.exists()) authorName = profileSnap.data().fullName || authorName;
+      } catch (profileErr) {
+        console.warn("Could not fetch profile name, using fallback:", profileErr);
+      }
+
+      await addDoc(collection(db, "communityPosts"), {
+        authorId: user.uid,
+        authorName,
+        petId: null,
+        content: content.trim(),
+        photoUrl: null,
+        isFlagged: false,
+        isRemoved: false,
+        createdAt: serverTimestamp(),
+      });
+      setContent("");
+      await load();
+    } catch (err: any) {
+      console.error("Failed to post:", err);
+      setReportStatus(err.message || "Could not publish post. Please try again.");
+    } finally {
+      setPosting(false);
     }
-
-    // Firestore has no joins, so pull the display name once and store it
-    // directly on the post (denormalized) rather than looking it up per-post.
-    const profileSnap = await getDoc(doc(db, "profiles", user.uid));
-    const authorName = profileSnap.exists() ? profileSnap.data().fullName : null;
-
-    await addDoc(collection(db, "communityPosts"), {
-      authorId: user.uid,
-      authorName: authorName || user.email,
-      petId: null,
-      content,
-      photoUrl: null,
-      isFlagged: false,
-      isRemoved: false,
-      createdAt: serverTimestamp(),
-    });
-    setContent("");
-    setPosting(false);
-    load();
   }
 
   async function flagPost(postId: string) {
-    setReportStatus(null);
     try {
       await updateDoc(doc(db, "communityPosts", postId), { isFlagged: true });
-      setReportStatus("Thanks — this post has been reported and flagged for review.");
-      load();
+      setReportStatus("Post reported for review.");
+      await load();
     } catch (err: any) {
       setReportStatus(err.message || "Could not report this post. Try again.");
     }
@@ -99,20 +114,17 @@ export default function CommunityPage() {
         <div className="space-y-2 mb-6">
           {alerts.map((a) => (
             <div key={a.id} className="bg-alert-500 text-white text-sm rounded-xl p-3">
-              🚨 {a.message}
-              <span className="block text-xs opacity-80 mt-0.5">
-                {formatDistanceToNow(toJsDate(a.createdAt))} ago
-              </span>
+              <strong>Alert:</strong> {a.message}
             </div>
           ))}
         </div>
       )}
 
-      <form onSubmit={submitPost} className="card mb-6">
+      <form onSubmit={submitPost} className="card mb-6 space-y-3">
         <textarea
           required
-          aria-label="Community post content"
-          placeholder="Share an update, ask a question..."
+          aria-label="Post content"
+          placeholder="Share an update with the community..."
           className="input-field text-sm"
           rows={3}
           value={content}

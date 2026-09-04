@@ -9,10 +9,13 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
+  getDoc,
+  doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { HealthLog } from "@/types";
 import { format, isBefore, addDays } from "date-fns";
+import { logActivity } from "@/lib/activityLog";
 
 export default function HealthLogPanel({ petId }: { petId: string }) {
   const [logs, setLogs] = useState<HealthLog[]>([]);
@@ -38,7 +41,7 @@ export default function HealthLogPanel({ petId }: { petId: string }) {
   async function addLog(e: React.FormEvent) {
     e.preventDefault();
     if (!label && logType !== "weight") return;
-    await addDoc(collection(db, "healthLogs"), {
+    const docRef = await addDoc(collection(db, "healthLogs"), {
       petId,
       logType,
       label: label || "Weight check-in",
@@ -47,6 +50,14 @@ export default function HealthLogPanel({ petId }: { petId: string }) {
       loggedDate: new Date().toISOString().slice(0, 10),
       createdAt: serverTimestamp(),
     });
+
+    await logActivity({
+      userId: (await getDoc(doc(db, "pets", petId))).data()?.ownerId || "unknown",
+      action: "health_log_added",
+      petId,
+      metadata: { logType, label: label || "Weight check-in" },
+    });
+
     setLabel("");
     setValue("");
     setDueDate("");

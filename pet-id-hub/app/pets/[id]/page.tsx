@@ -33,29 +33,37 @@ export default function PublicPetPage() {
   }, [id]);
 
   async function load() {
-    const snap = await getDoc(doc(db, "pets", id));
-    if (snap.exists()) setPet({ id: snap.id, ...snap.data() } as Pet);
+    try {
+      const snap = await getDoc(doc(db, "pets", id));
+      if (snap.exists()) setPet({ id: snap.id, ...snap.data() } as Pet);
 
-    // Log the scan (fire and forget) — anonymous writes allowed by security rules
-    addDoc(collection(db, "qrScans"), {
-      petId: id,
-      scannedAt: serverTimestamp(),
-      finderMessage: null,
-      finderContact: null,
-      finderLat: null,
-      finderLng: null,
-    });
+      // Log the scan (fire and forget) — anonymous writes allowed by security rules
+      try {
+        addDoc(collection(db, "qrScans"), {
+          petId: id,
+          scannedAt: serverTimestamp(),
+          finderMessage: null,
+          finderContact: null,
+          finderLat: null,
+          finderLng: null,
+        });
+      } catch {}
 
-    // For the manual comparison tool: other currently-lost pets (MVP: all lost pets)
-    const q = query(collection(db, "pets"), where("status", "==", "lost"), limit(12));
-    const lostSnap = await getDocs(q);
-    setOtherLostPets(
-      lostSnap.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as Pet)
-        .filter((p) => p.id !== id)
-    );
-
-    setLoading(false);
+      // For the manual comparison tool: other currently-lost pets (MVP: all lost pets)
+      try {
+        const q = query(collection(db, "pets"), where("status", "==", "lost"), limit(12));
+        const lostSnap = await getDocs(q);
+        setOtherLostPets(
+          lostSnap.docs
+            .map((d) => ({ id: d.id, ...d.data() }) as Pet)
+            .filter((p) => p.id !== id)
+        );
+      } catch {}
+    } catch (err) {
+      console.error("Failed to load pet details:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function sendFinderMessage(e: React.FormEvent) {

@@ -50,7 +50,9 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if isSignedIn() &&
-        (resource.data.ownerId == request.auth.uid || isAdmin());
+        (resource.data.ownerId == request.auth.uid ||
+         (resource.data.ownerEmail != null && request.auth.token.email != null && resource.data.ownerEmail == request.auth.token.email) ||
+         isAdmin());
     }
 
     // ---------------------------------------------------------
@@ -80,6 +82,25 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
       allow update: if isSignedIn() &&
         (resource.data.authorId == request.auth.uid || isAdmin());
+    }
+
+    // ---------------------------------------------------------
+    // ACTIVITY LOG — users can read their own logs; any signed-in
+    // user can create logs (client-side writes are best-effort).
+    // ---------------------------------------------------------
+    match /activityLog/{logId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------
+    // NOTIFICATIONS — users can read their own notifications; any
+    // signed-in user can create notifications.
+    // ---------------------------------------------------------
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // ---------------------------------------------------------

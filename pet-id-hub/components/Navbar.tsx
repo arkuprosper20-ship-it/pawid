@@ -1,27 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { logActivity } from "@/lib/activityLog";
 
 export default function Navbar() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const prevUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setIsSignedIn(Boolean(user));
+      const uid = user?.uid || null;
+      const wasSignedIn = prevUserRef.current !== null;
+      const isSignedInNow = uid !== null;
+
+      setIsSignedIn(isSignedInNow);
       setIsAdmin(false);
+      prevUserRef.current = uid;
+
       if (!user) return;
 
       try {
         const profile = await getDoc(doc(db, "profiles", user.uid));
         setIsAdmin(profile.exists() && profile.data().isAdmin === true);
       } catch {
-        // If the profile cannot be read, never expose the admin navigation.
         setIsAdmin(false);
+      }
+
+      if (isSignedInNow && !wasSignedIn) {
+        await logActivity({
+          userId: user.uid,
+          action: "sign_in",
+          metadata: { email: user.email || null, provider: user.providerData[0]?.providerId || "anonymous" },
+        });
+      } else if (!isSignedInNow && wasSignedIn) {
+        await logActivity({
+          userId: prevUserRef.current || "unknown",
+          action: "sign_out",
+        });
       }
     });
     return () => unsubscribe();

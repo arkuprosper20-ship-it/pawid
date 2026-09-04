@@ -56,30 +56,56 @@ export default function AdminPage() {
     loadData();
   }
   async function loadData() {
-    const petsSnap = await getDocs(
-      query(collection(db, "pets"), orderBy("createdAt", "desc"))
-    );
-    setPets(petsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Pet));
-
-    const postsSnap = await getDocs(
-      query(collection(db, "communityPosts"), orderBy("createdAt", "desc"), limit(50))
-    );
-    setPosts(postsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as CommunityPost));
-
-    const [totalPetsCount, lostPetsCount, totalScansCount, totalUsersCount] =
-      await Promise.all([
-        getCountFromServer(collection(db, "pets")),
-        getCountFromServer(query(collection(db, "pets"), where("status", "==", "lost"))),
-        getCountFromServer(collection(db, "qrScans")),
-        getCountFromServer(collection(db, "profiles")),
+    try {
+      const [petsSnap, postsSnap] = await Promise.all([
+        getDocs(query(collection(db, "pets"), orderBy("createdAt", "desc"), limit(100))),
+        getDocs(query(collection(db, "communityPosts"), orderBy("createdAt", "desc"), limit(50))),
       ]);
+      setPets(petsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Pet));
+      setPosts(postsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as CommunityPost));
 
-    setStats({
-      totalPets: totalPetsCount.data().count,
-      lostPets: lostPetsCount.data().count,
-      totalScans: totalScansCount.data().count,
-      totalUsers: totalUsersCount.data().count,
-    });
+      let totalPets = 0;
+      let lostPets = 0;
+      let totalScans = 0;
+      let totalUsers = 0;
+
+      try {
+        const [totalPetsCount, lostPetsCount, totalScansCount, totalUsersCount] =
+          await Promise.all([
+            getCountFromServer(collection(db, "pets")),
+            getCountFromServer(query(collection(db, "pets"), where("status", "==", "lost"))),
+            getCountFromServer(collection(db, "qrScans")),
+            getCountFromServer(collection(db, "profiles")),
+          ]);
+        totalPets = totalPetsCount.data().count;
+        lostPets = lostPetsCount.data().count;
+        totalScans = totalScansCount.data().count;
+        totalUsers = totalUsersCount.data().count;
+      } catch (countErr) {
+        console.warn("Count queries failed, falling back to manual counts:", countErr);
+        totalPets = petsSnap.size;
+        lostPets = petsSnap.docs.filter((d) => d.data().status === "lost").length;
+        totalScans = 0;
+        totalUsers = 0;
+        try {
+          const usersSnap = await getDocs(collection(db, "profiles"));
+          totalUsers = usersSnap.size;
+        } catch {}
+        try {
+          const scansSnap = await getDocs(collection(db, "qrScans"));
+          totalScans = scansSnap.size;
+        } catch {}
+      }
+
+      setStats({
+        totalPets,
+        lostPets,
+        totalScans,
+        totalUsers,
+      });
+    } catch (err) {
+      console.error("Failed to load admin data:", err);
+    }
   }
 
   async function removePost(postId: string) {

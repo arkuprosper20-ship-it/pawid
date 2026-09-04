@@ -4,6 +4,8 @@ import { useState } from "react";
 import { doc, updateDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Pet } from "@/types";
+import { logActivity } from "@/lib/activityLog";
+import { createNotification } from "@/lib/notifications";
 
 export default function LostModeToggle({
   pet,
@@ -33,12 +35,18 @@ export default function LostModeToggle({
     onUpdate({
       ...pet,
       status: nextStatus,
-      lostSince: updates.lostSince,
-      rewardNote: updates.rewardNote,
-      lastSeenLocation: updates.lastSeenLocation,
+      lostSince: updates.lostSince as string | null,
+      rewardNote: updates.rewardNote as string | null,
+      lastSeenLocation: updates.lastSeenLocation as string | null,
     });
 
-    // Fire a community broadcast alert when a pet goes lost
+    await logActivity({
+      userId: pet.ownerId,
+      action: nextStatus === "lost" ? "pet_lost_mode_enabled" : "pet_lost_mode_disabled",
+      petId: pet.id,
+      metadata: { petName: pet.name },
+    });
+
     if (nextStatus === "lost") {
       await addDoc(collection(db, "broadcastAlerts"), {
         petId: pet.id,
@@ -46,6 +54,13 @@ export default function LostModeToggle({
         triggeredBy: null,
         isManual: false,
         createdAt: serverTimestamp(),
+      });
+    } else {
+      await createNotification({
+        userId: pet.ownerId,
+        type: "pet_found",
+        message: `Great news! ${pet.name} has been marked as found.`,
+        petId: pet.id,
       });
     }
 

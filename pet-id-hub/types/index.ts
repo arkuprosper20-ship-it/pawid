@@ -27,6 +27,7 @@ export interface Pet {
   rewardNote: string | null;
   lastSeenLocation: string | null;
   badges: string[];
+  previousOwnerIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -45,7 +46,7 @@ export interface HealthLog {
 export interface CommunityPost {
   id: string;
   authorId: string;
-  authorName: string | null; // denormalized at write time (Firestore has no joins)
+  authorName: string | null;
   petId: string | null;
   content: string;
   photoUrl: string | null;
@@ -60,6 +61,7 @@ export interface Profile {
   city: string | null;
   phone: string | null;
   isAdmin: boolean;
+  petIds: string[];
   createdAt: string;
 }
 
@@ -79,5 +81,24 @@ export interface BroadcastAlert {
   message: string;
   triggeredBy: string | null;
   isManual: boolean;
+  createdAt: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  action: string;
+  petId?: string;
+  metadata?: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: "pet_found" | "broadcast" | "system";
+  message: string;
+  petId?: string;
+  read: boolean;
   createdAt: string;
 }

@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInAnonymously } from "firebase/auth";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, arrayUnion } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
+import { logActivity, addPetIdToProfile } from "@/lib/activityLog";
 
 export default function NewPetPage() {
   const router = useRouter();
@@ -48,19 +49,25 @@ export default function NewPetPage() {
     }
 
     try {
-      // Visitors receive an anonymous Firebase account automatically. There
-      // is no sign-in step, but their new pet profile remains protected.
       const user = auth.currentUser || (await signInAnonymously(auth)).user;
       let photoUrl: string | null = null;
       if (photoFile) {
-        const fileExt = photoFile.name.split(".").pop();
-        const storageRef = ref(storage, `pet-photos/${user.uid}/${Date.now()}.${fileExt}`);
-        await uploadBytes(storageRef, photoFile);
-        photoUrl = await getDownloadURL(storageRef);
+        try {
+          const fileExt = photoFile.name.split(".").pop();
+          const storageRef = ref(storage, `pet-photos/${user.uid}/${Date.now()}.${fileExt}`);
+          await uploadBytes(storageRef, photoFile);
+          photoUrl = await getDownloadURL(storageRef);
+        } catch (storageErr: any) {
+          console.warn("Storage upload failed:", storageErr);
+          if (storageErr?.code === "storage/retry-limit-exceeded" || storageErr?.message?.includes("retry-limit-exceeded")) {
+            console.error("Firebase Storage is not enabled in Firebase Console. Please visit https://console.firebase.google.com/project/pawidhack/storage to click 'Get Started'.");
+          }
+        }
       }
 
       const docRef = await addDoc(collection(db, "pets"), {
         ownerId: user.uid,
+        ownerEmail: user.email || null,
         name: form.name,
         species,
         breed: form.breed || null,
@@ -76,9 +83,26 @@ export default function NewPetPage() {
         rewardNote: null,
         lastSeenLocation: null,
         badges: [],
+        previousOwnerIds: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      await logActivity({
+        userId: user.uid,
+        action: "pet_created",
+        petId: docRef.id,
+        metadata: { petName: form.name, species },
+      });
+
+      await addPetIdToProfile(user.uid, docRef.id);
+
+      const raw = window.localStorage.getItem("pawid_local_pet_ids");
+      const list: string[] = raw ? JSON.parse(raw) : [];
+      if (!list.includes(docRef.id)) {
+        list.push(docRef.id);
+        window.localStorage.setItem("pawid_local_pet_ids", JSON.stringify(list));
+      }
 
       router.push(`/dashboard/pets/${docRef.id}`);
     } catch (err: any) {

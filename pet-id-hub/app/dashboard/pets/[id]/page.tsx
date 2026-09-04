@@ -10,6 +10,7 @@ import LostModeToggle from "@/components/LostModeToggle";
 import HealthLogPanel from "@/components/HealthLogPanel";
 import { BadgeEditor } from "@/components/BadgeList";
 import { getDailyCareTip } from "@/lib/careTips";
+import { logActivity } from "@/lib/activityLog";
 
 export default function PetDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,9 +22,14 @@ export default function PetDetailPage() {
   }, [id]);
 
   async function load() {
-    const snap = await getDoc(doc(db, "pets", id));
-    if (snap.exists()) setPet({ id: snap.id, ...snap.data() } as Pet);
-    setLoading(false);
+    try {
+      const snap = await getDoc(doc(db, "pets", id));
+      if (snap.exists()) setPet({ id: snap.id, ...snap.data() } as Pet);
+    } catch (err) {
+      console.error("Failed to load pet:", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function toggleBadge(badge: Badge) {
@@ -37,6 +43,13 @@ export default function PetDetailPage() {
         ? { ...p, badges: has ? p.badges.filter((b) => b !== badge) : [...p.badges, badge] }
         : p
     );
+
+    await logActivity({
+      userId: pet.ownerId,
+      action: "badge_toggled",
+      petId: pet.id,
+      metadata: { badge, added: !has },
+    });
   }
 
   if (loading) return <p className="text-gray-400">Loading...</p>;
