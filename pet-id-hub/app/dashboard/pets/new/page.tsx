@@ -8,6 +8,14 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import { logActivity, addPetIdToProfile } from "@/lib/activityLog";
 
+const BREED_OPTIONS: Record<string, string[]> = {
+  Dog: ["Labrador", "German Shepherd", "Golden Retriever", "Bulldog", "Poodle", "Rottweiler", "Beagle", "Dachshund", "Siberian Husky", "Great Dane", "Doberman", "Boxer", "Chihuahua", "Shih Tzu", "Pomeranian", "Corgi", "Border Collie", "Australian Shepherd", "Jack Russell", "Pit Bull", "Mixed"],
+  Cat: ["Persian", "Maine Coon", "Siamese", "Bengal", "Sphynx", "Ragdoll", "British Shorthair", "Abyssinian", "Devon Rex", "Scottish Fold", "American Shorthair", "Mixed"],
+  Bird: ["Parakeet", "Cockatiel", "African Grey", "Macaw", "Lovebird", "Canary", "Finch", "Amazon Parrot", "Other"],
+  Rabbit: ["Holland Lop", "Netherland Dwarf", "Rex", "Lionhead", "Angora", "Flemish Giant", "Mixed"],
+  Other: ["Unknown", "Mixed"],
+};
+
 export default function NewPetPage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -111,18 +119,41 @@ export default function NewPetPage() {
     }
 
     try {
-      const user = auth.currentUser || (await signInAnonymously(auth)).user;
+      let user = auth.currentUser;
+      if (!user) {
+        const cred = await signInAnonymously(auth);
+        user = cred.user;
+      }
+      if (!user) {
+        setError("You must be signed in to add a pet.");
+        setLoading(false);
+        return;
+      }
+
       let photoUrl: string | null = null;
       if (photoFile) {
         try {
-          const fileExt = photoFile.name.split(".").pop();
+          const rawName = photoFile.name || `photo-${Date.now()}`;
+          const fileExt = rawName.includes(".") ? rawName.split(".").pop() : "jpg";
           const storageRef = ref(storage, `pet-photos/${user.uid}/${Date.now()}.${fileExt}`);
           await uploadBytes(storageRef, photoFile);
           photoUrl = await getDownloadURL(storageRef);
         } catch (storageErr: any) {
           console.warn("Storage upload failed:", storageErr);
+          const msg = storageErr?.message || "Image upload was denied.";
           if (storageErr?.code === "storage/retry-limit-exceeded" || storageErr?.message?.includes("retry-limit-exceeded")) {
             console.error("Firebase Storage is not enabled in Firebase Console. Please visit https://console.firebase.google.com/project/pawidhack/storage to click 'Get Started'.");
+            setError("Firebase Storage is not enabled. Please enable it in the Firebase Console.");
+            setLoading(false);
+            return;
+          } else if (storageErr?.code === "storage/unauthorized" || storageErr?.code === "storage/permission-denied") {
+            setError("Storage permission denied. Please sign in again or contact support.");
+            setLoading(false);
+            return;
+          } else {
+            setError(msg);
+            setLoading(false);
+            return;
           }
         }
       }
@@ -150,27 +181,34 @@ export default function NewPetPage() {
         updatedAt: serverTimestamp(),
       });
 
-      await logActivity({
-        userId: user.uid,
-        action: "pet_created",
-        petId: docRef.id,
-        metadata: { petName: form.name, species },
-      });
+      const petId = docRef.id;
+      const userId = user.uid;
 
-      await addPetIdToProfile(user.uid, docRef.id);
+      await Promise.all([
+        logActivity({
+          userId,
+          action: "pet_created",
+          petId,
+          metadata: { petName: form.name, species },
+        }),
+        addPetIdToProfile(userId, petId),
+      ]);
 
-      const raw = window.localStorage.getItem("pawid_local_pet_ids");
-      const list: string[] = raw ? JSON.parse(raw) : [];
-      if (!list.includes(docRef.id)) {
-        list.push(docRef.id);
-        window.localStorage.setItem("pawid_local_pet_ids", JSON.stringify(list));
-      }
+      try {
+        const raw = window.localStorage.getItem("pawid_local_pet_ids");
+        const list: string[] = raw ? JSON.parse(raw) : [];
+        if (!list.includes(petId)) {
+          list.push(petId);
+          window.localStorage.setItem("pawid_local_pet_ids", JSON.stringify(list));
+        }
+      } catch {}
 
-      router.push(`/dashboard/pets/${docRef.id}`);
+      router.push(`/dashboard/pets/${petId}`);
     } catch (err: any) {
       setError(err.message || "Something went wrong creating the pet.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -211,12 +249,18 @@ export default function NewPetPage() {
             <option>Other</option>
           </select>
           <input
+            list="breed-options"
             aria-label="Breed"
             placeholder="Breed"
             className="input-field"
             value={form.breed}
             onChange={(e) => update("breed", e.target.value)}
           />
+          <datalist id="breed-options">
+            {(BREED_OPTIONS[form.species] || []).map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
         </div>
         {form.species === "Other" && (
           <input
