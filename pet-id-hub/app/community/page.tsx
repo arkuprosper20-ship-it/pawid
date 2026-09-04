@@ -140,14 +140,19 @@ export default function CommunityPage() {
   async function deletePost(post: CommunityPost) {
     if (!currentUid) return;
     const isOwner = post.authorId === currentUid;
-    if (!isOwner && !currentIsAdmin) return;
+    if (!isOwner && !currentIsAdmin) {
+      setReportStatus("You can only delete your own posts.");
+      return;
+    }
     const ok = window.confirm("Delete this post? This cannot be undone.");
     if (!ok) return;
     try {
       await deleteDoc(doc(db, "communityPosts", post.id));
-      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      await load();
+      setReportStatus("Post deleted.");
     } catch (err: any) {
       setReportStatus(err.message || "Could not delete this post.");
+      await load();
     }
   }
 
