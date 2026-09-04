@@ -23,11 +23,23 @@ export default function NewPetPage() {
     otherSpecies: "",
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function update(field: string, val: string) {
     setForm((f) => ({ ...f, [field]: val }));
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] || null;
+    setPhotoFile(file);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPhotoPreview(url);
+    } else {
+      setPhotoPreview(null);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -175,9 +187,18 @@ export default function NewPetPage() {
             type="file"
             accept="image/*"
             aria-label="Pet photo"
-            onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+            onChange={handlePhotoChange}
             className="text-sm"
           />
+          {photoPreview && (
+            <div className="mt-2">
+              <img
+                src={photoPreview}
+                alt="Selected pet photo preview"
+                className="w-full max-h-48 object-cover rounded-lg border border-gray-200"
+              />
+            </div>
+          )}
         </div>
         <textarea
           aria-label="Medical notes"
