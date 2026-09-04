@@ -74,13 +74,22 @@ service cloud.firestore {
 
     // ---------------------------------------------------------
     // COMMUNITY POSTS — signed-in users can read non-removed posts
-    // (or their own removed ones), create their own, flag/edit their own.
+    // (or their own removed ones), create their own, edit/delete
+    // their own, or have any admin edit/delete any post.
     // ---------------------------------------------------------
     match /communityPosts/{postId} {
       allow read: if isSignedIn() &&
-        (resource.data.isRemoved == false || resource.data.authorId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+        (resource.data.isRemoved == false || resource.data.authorId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+        request.resource.data.authorId == request.auth.uid &&
+        request.resource.data.authorIsAdmin == false &&
+        request.resource.data.isRemoved == false &&
+        request.resource.data.isFlagged == false &&
+        request.resource.data.isEdited == false &&
+        request.resource.data.editedAt == null;
       allow update: if isSignedIn() &&
+        (resource.data.authorId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() &&
         (resource.data.authorId == request.auth.uid || isAdmin());
     }
 

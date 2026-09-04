@@ -39,8 +39,10 @@ export default function CompleteSignInPage() {
       const profileRef = fsDoc(db, "profiles", result.user.uid);
       const existing = await getDoc(profileRef);
       if (!existing.exists()) {
+        const fallbackName = result.user.displayName || result.user.email?.split("@")[0] || "Member";
         await fsSetDoc(profileRef, {
-          fullName: null,
+          fullName: fallbackName,
+          username: fallbackName,
           city: null,
           phone: null,
           isAdmin: false,

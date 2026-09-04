@@ -28,8 +28,10 @@ export default function LoginPage() {
       const profileRef = doc(db, "profiles", user.uid);
       const snap = await getDoc(profileRef);
       if (!snap.exists()) {
+        const fallbackName = name || user.displayName || user.email?.split("@")[0] || "Member";
         await setDoc(profileRef, {
-          fullName: name || user.displayName || user.email?.split("@")[0] || null,
+          fullName: fallbackName,
+          username: fallbackName,
           city: null,
           phone: null,
           isAdmin: false,

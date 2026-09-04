@@ -47,17 +47,24 @@ export interface CommunityPost {
   id: string;
   authorId: string;
   authorName: string | null;
+  /** Username shown publicly (admins render as "Management"). Never an email. */
+  authorUsername: string | null;
+  authorIsAdmin: boolean;
   petId: string | null;
   content: string;
   photoUrl: string | null;
   isFlagged: boolean;
   isRemoved: boolean;
+  isEdited: boolean;
   createdAt: string;
+  editedAt: string | null;
 }
 
 export interface Profile {
   id: string;
   fullName: string | null;
+  /** Public username. Never the user's email. */
+  username: string | null;
   city: string | null;
   phone: string | null;
   isAdmin: boolean;

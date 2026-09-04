@@ -14,6 +14,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteDoc,
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
@@ -109,8 +110,19 @@ export default function AdminPage() {
   }
 
   async function removePost(postId: string) {
-    await updateDoc(doc(db, "communityPosts", postId), { isRemoved: true });
+    try {
+      await deleteDoc(doc(db, "communityPosts", postId));
+    } catch {
+      await updateDoc(doc(db, "communityPosts", postId), { isRemoved: true });
+    }
     loadData();
+  }
+
+  function displayAuthor(post: CommunityPost): string {
+    if (post.authorIsAdmin) return "Management";
+    if (post.authorUsername && post.authorUsername.trim()) return post.authorUsername;
+    if (post.authorName && post.authorName.trim()) return post.authorName;
+    return "Unknown member";
   }
 
   async function triggerBroadcast(e: React.FormEvent) {
@@ -218,12 +230,17 @@ export default function AdminPage() {
         <h2 className="font-semibold mb-3">Content moderation</h2>
         <div className="space-y-2">
           {posts
-            .filter((p) => p.isFlagged && !p.isRemoved)
+            .filter((p) => !p.isRemoved)
             .map((p) => (
               <div key={p.id} className="flex justify-between items-start border-b border-gray-50 pb-2">
-                <div>
-                  <p className="text-sm">{p.content}</p>
-                  <p className="text-xs text-gray-400">{p.authorName || "Unknown"}</p>
+                <div className="min-w-0 flex-1 pr-3">
+                  <p className="text-xs text-gray-400">
+                    {displayAuthor(p)}
+                    {p.isFlagged && (
+                      <span className="ml-2 text-yellow-600">⚑ Flagged</span>
+                    )}
+                  </p>
+                  <p className="text-sm break-words">{p.content}</p>
                 </div>
                 <button
                   onClick={() => removePost(p.id)}
@@ -233,8 +250,8 @@ export default function AdminPage() {
                 </button>
               </div>
             ))}
-          {posts.filter((p) => p.isFlagged && !p.isRemoved).length === 0 && (
-            <p className="text-sm text-gray-400">No flagged posts.</p>
+          {posts.filter((p) => !p.isRemoved).length === 0 && (
+            <p className="text-sm text-gray-400">No posts to moderate.</p>
           )}
         </div>
       </div>
