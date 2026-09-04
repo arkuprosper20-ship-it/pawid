@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signInAnonymously } from "firebase/auth";
 import { collection, addDoc, serverTimestamp, doc, updateDoc, arrayUnion } from "firebase/firestore";
@@ -10,6 +10,7 @@ import { logActivity, addPetIdToProfile } from "@/lib/activityLog";
 
 export default function NewPetPage() {
   const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [form, setForm] = useState({
     name: "",
     species: "Dog",
@@ -24,6 +25,9 @@ export default function NewPetPage() {
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +44,49 @@ export default function NewPetPage() {
     } else {
       setPhotoPreview(null);
     }
+  }
+
+  async function openCamera() {
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      setCameraStream(stream);
+      setCameraOpen(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err: any) {
+      setCameraError(err.message || "Camera not available.");
+    }
+  }
+
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((t) => t.stop());
+      setCameraStream(null);
+    }
+    setCameraOpen(false);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }
+
+  function takePhoto() {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `pet-photo-${Date.now()}.png`, { type: "image/png" });
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
+      stopCamera();
+    }, "image/png");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -123,6 +170,14 @@ export default function NewPetPage() {
     setLoading(false);
   }
 
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, [cameraStream]);
+
   return (
     <div className="max-w-lg mx-auto">
       <h1 className="text-2xl font-bold mb-6">Add a pet</h1>
@@ -183,13 +238,23 @@ export default function NewPetPage() {
         />
         <div>
           <label className="text-sm text-gray-500 mb-1 block">Photo</label>
-          <input
-            type="file"
-            accept="image/*"
-            aria-label="Pet photo"
-            onChange={handlePhotoChange}
-            className="text-sm"
-          />
+          <div className="flex gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              aria-label="Pet photo"
+              onChange={handlePhotoChange}
+              className="text-sm flex-1"
+            />
+            <button
+              type="button"
+              onClick={openCamera}
+              className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50"
+            >
+              📷 Camera
+            </button>
+          </div>
           {photoPreview && (
             <div className="mt-2">
               <img
@@ -199,6 +264,16 @@ export default function NewPetPage() {
               />
             </div>
           )}
+          {cameraOpen && (
+            <div className="mt-3 space-y-2">
+              <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg border border-gray-200" />
+              <div className="flex gap-2">
+                <button type="button" onClick={takePhoto} className="btn-primary text-sm">Capture</button>
+                <button type="button" onClick={stopCamera} className="text-sm text-gray-500 border border-gray-300 rounded-lg px-3 py-1.5">Cancel</button>
+              </div>
+            </div>
+          )}
+          {cameraError && <p className="text-xs text-alert-500 mt-1">{cameraError}</p>}
         </div>
         <textarea
           aria-label="Medical notes"
