@@ -69,7 +69,7 @@ export default function DashboardPage() {
         if (!petsMap.has(d.id)) petsMap.set(d.id, { id: d.id, ...d.data() } as Pet);
       });
 
-      const profilePetIds: string[] = profileSnap.exists() ? (profileSnap.data().petIds || []) : [];
+      const profilePetIds: string[] = profileSnap.exists() ? ((profileSnap.data() as any)?.petIds || []) : [];
 
       try {
         const raw = window.localStorage.getItem("pawid_local_pet_ids");
