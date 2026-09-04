@@ -124,14 +124,16 @@ export default function Navbar() {
               <button type="button" onClick={signOut} className="text-gray-400 hover:text-gray-700">
                 Sign out
               </button>
-              <button
-                type="button"
-                onClick={deleteAccount}
-                disabled={deleting}
-                className="text-xs text-alert-500 hover:underline"
-              >
-                {deleting ? "Deleting..." : "Delete Account"}
-              </button>
+              {!isAdmin && (
+                <button
+                  type="button"
+                  onClick={deleteAccount}
+                  disabled={deleting}
+                  className="text-xs text-alert-500 hover:underline"
+                >
+                  {deleting ? "Deleting..." : "Delete Account"}
+                </button>
+              )}
             </>
           ) : (
             <Link href="/login" className="btn-primary text-sm">

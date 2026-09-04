@@ -40,7 +40,7 @@ service cloud.firestore {
         (isAdmin() ||
           (request.auth.uid == userId &&
            request.resource.data.isAdmin == resource.data.isAdmin));
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId && !isAdmin();
     }
 
     // ---------------------------------------------------------
