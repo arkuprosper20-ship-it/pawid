@@ -49,6 +49,8 @@ export default function Navbar() {
   }, []);
 
   async function signOut() {
+    const ok = window.confirm("Are you sure you want to sign out?");
+    if (!ok) return;
     await firebaseSignOut(auth);
     window.location.href = "/";
   }
