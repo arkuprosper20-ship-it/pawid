@@ -3,9 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signInAnonymously } from "firebase/auth";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, arrayUnion } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { auth, db, storage } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { logActivity, addPetIdToProfile } from "@/lib/activityLog";
 
 const BREED_OPTIONS: Record<string, string[]> = {
@@ -15,6 +14,34 @@ const BREED_OPTIONS: Record<string, string[]> = {
   Rabbit: ["Holland Lop", "Netherland Dwarf", "Rex", "Lionhead", "Angora", "Flemish Giant", "Mixed"],
   Other: ["Unknown", "Mixed"],
 };
+
+function resizeImage(file: File, maxWidth = 800): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas not supported"));
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      reader.readAsDataURL(file);
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function NewPetPage() {
   const router = useRouter();
@@ -31,7 +58,6 @@ export default function NewPetPage() {
     petIdentifier: "",
     otherSpecies: "",
   });
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -43,14 +69,14 @@ export default function NewPetPage() {
     setForm((f) => ({ ...f, [field]: val }));
   }
 
-  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null;
-    setPhotoFile(file);
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setPhotoPreview(url);
-    } else {
-      setPhotoPreview(null);
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImage(file);
+      setPhotoPreview(dataUrl);
+    } catch {
+      setError("Could not process image. Please try another file.");
     }
   }
 
@@ -91,13 +117,9 @@ export default function NewPetPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], `pet-photo-${Date.now()}.png`, { type: "image/png" });
-      setPhotoFile(file);
-      setPhotoPreview(URL.createObjectURL(file));
-      stopCamera();
-    }, "image/png");
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+    setPhotoPreview(dataUrl);
+    stopCamera();
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -108,12 +130,6 @@ export default function NewPetPage() {
     const species = form.species === "Other" ? form.otherSpecies.trim() : form.species;
     if (!species) {
       setError("Please tell us what kind of pet you have.");
-      setLoading(false);
-      return;
-    }
-
-    if (photoFile && (!photoFile.type.startsWith("image/") || photoFile.size > 5 * 1024 * 1024)) {
-      setError("Choose an image smaller than 5 MB.");
       setLoading(false);
       return;
     }
@@ -130,34 +146,6 @@ export default function NewPetPage() {
         return;
       }
 
-      let photoUrl: string | null = null;
-      if (photoFile) {
-        try {
-          const rawName = photoFile.name || `photo-${Date.now()}`;
-          const fileExt = rawName.includes(".") ? rawName.split(".").pop() : "jpg";
-          const storageRef = ref(storage, `pet-photos/${user.uid}/${Date.now()}.${fileExt}`);
-          await uploadBytes(storageRef, photoFile);
-          photoUrl = await getDownloadURL(storageRef);
-        } catch (storageErr: any) {
-          console.warn("Storage upload failed:", storageErr);
-          const msg = storageErr?.message || "Image upload was denied.";
-          if (storageErr?.code === "storage/retry-limit-exceeded" || storageErr?.message?.includes("retry-limit-exceeded")) {
-            console.error("Firebase Storage is not enabled in Firebase Console. Please visit https://console.firebase.google.com/project/pawidhack/storage to click 'Get Started'.");
-            setError("Firebase Storage is not enabled. Please enable it in the Firebase Console.");
-            setLoading(false);
-            return;
-          } else if (storageErr?.code === "storage/unauthorized" || storageErr?.code === "storage/permission-denied") {
-            setError("Storage permission denied. Please sign in again or contact support.");
-            setLoading(false);
-            return;
-          } else {
-            setError(msg);
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
       const docRef = await addDoc(collection(db, "pets"), {
         ownerId: user.uid,
         ownerEmail: user.email || null,
@@ -170,7 +158,7 @@ export default function NewPetPage() {
         emergencyContactPhone: form.emergencyContactPhone || null,
         microchipId: form.microchipId || null,
         petIdentifier: form.petIdentifier.trim() || null,
-        photoUrl,
+        photoUrl: photoPreview,
         status: "normal",
         lostSince: null,
         rewardNote: null,
