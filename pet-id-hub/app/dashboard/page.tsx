@@ -56,12 +56,11 @@ export default function DashboardPage() {
     try {
       const petsMap = new Map<string, Pet>();
 
-      const [ownerSnap, emailSnap, profileSnap] = await Promise.all([
+      const [ownerSnap, emailSnap] = await Promise.all([
         getDocs(query(collection(db, "pets"), where("ownerId", "==", uid))),
         email
           ? getDocs(query(collection(db, "pets"), where("ownerEmail", "==", email)))
           : Promise.resolve({ docs: [] }),
-        getDoc(doc(db, "profiles", uid)).catch(() => ({ exists: false, data: () => ({ petIds: [] }) })),
       ]);
 
       ownerSnap.docs.forEach((d) => petsMap.set(d.id, { id: d.id, ...d.data() } as Pet));
@@ -69,7 +68,16 @@ export default function DashboardPage() {
         if (!petsMap.has(d.id)) petsMap.set(d.id, { id: d.id, ...d.data() } as Pet);
       });
 
-      const profilePetIds: string[] = profileSnap.exists() ? ((profileSnap.data() as any)?.petIds || []) : [];
+      let profilePetIds: string[] = [];
+      try {
+        const profileSnap = await getDoc(doc(db, "profiles", uid));
+        if (profileSnap.exists()) {
+          const profileData = profileSnap.data();
+          profilePetIds = Array.isArray((profileData as any)?.petIds) ? (profileData as any).petIds : [];
+        }
+      } catch (e) {
+        console.warn("Could not load profile pet IDs:", e);
+      }
 
       try {
         const raw = window.localStorage.getItem("pawid_local_pet_ids");
