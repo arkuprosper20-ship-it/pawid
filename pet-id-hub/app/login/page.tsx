@@ -19,19 +19,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function ensureProfile(user: User, name?: string) {
+  async function ensureProfile(user: User, name?: string, usernameInput?: string) {
     try {
       const profileRef = doc(db, "profiles", user.uid);
       const snap = await getDoc(profileRef);
       if (!snap.exists()) {
         const fallbackName = name || user.displayName || user.email?.split("@")[0] || "Member";
+        const fallbackUsername = usernameInput || fallbackName;
         await setDoc(profileRef, {
           fullName: fallbackName,
-          username: fallbackName,
+          username: fallbackUsername,
           city: null,
           phone: null,
           isAdmin: false,
@@ -51,7 +53,7 @@ export default function LoginPage() {
     try {
       if (authMode === "register") {
         const res = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        await ensureProfile(res.user, fullName.trim());
+        await ensureProfile(res.user, fullName.trim(), username.trim());
       } else {
         const res = await signInWithEmailAndPassword(auth, email.trim(), password);
         await ensureProfile(res.user);
@@ -250,15 +252,26 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={handlePasswordSubmit} className="space-y-3">
             {authMode === "register" && (
-              <input
-                type="text"
-                required
-                aria-label="Full name"
-                placeholder="Your Name"
-                className="input-field"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
+              <>
+                <input
+                  type="text"
+                  required
+                  aria-label="Username"
+                  placeholder="Choose a username"
+                  className="input-field"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+                <input
+                  type="text"
+                  required
+                  aria-label="Full name"
+                  placeholder="Your Name"
+                  className="input-field"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </>
             )}
             <input
               type="email"

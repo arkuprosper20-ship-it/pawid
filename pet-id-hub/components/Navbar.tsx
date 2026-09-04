@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
-import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, signOut as firebaseSignOut, deleteUser as firebaseDeleteUser } from "firebase/auth";
+import { doc, getDoc, deleteDoc, getDocs, query, where, collection } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { logActivity } from "@/lib/activityLog";
 
 export default function Navbar() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const prevUserRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -52,6 +53,52 @@ export default function Navbar() {
     window.location.href = "/";
   }
 
+  async function deleteAccount() {
+    const user = auth.currentUser;
+    if (!user) return;
+    const ok = window.confirm(
+      "Delete your account permanently? This will remove your profile, pets, posts, and activity history. This cannot be undone."
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const uid = user.uid;
+
+      // Delete user-owned Firestore data
+      const collections = [
+        { name: "pets", query: query(collection(db, "pets"), where("ownerId", "==", uid)) },
+        { name: "communityPosts", query: query(collection(db, "communityPosts"), where("authorId", "==", uid)) },
+        { name: "activityLog", query: query(collection(db, "activityLog"), where("userId", "==", uid)) },
+        { name: "notifications", query: query(collection(db, "notifications"), where("userId", "==", uid)) },
+      ];
+
+      for (const col of collections) {
+        try {
+          const snap = await getDocs(col.query);
+          const deletes = snap.docs.map((d) => deleteDoc(d.ref));
+          await Promise.all(deletes);
+        } catch (e) {
+          console.warn(`Failed to delete ${col.name}:`, e);
+        }
+      }
+
+      // Delete profile last
+      try {
+        await deleteDoc(doc(db, "profiles", uid));
+      } catch (e) {
+        console.warn("Failed to delete profile:", e);
+      }
+
+      // Delete Firebase Auth user
+      await firebaseDeleteUser(user);
+      window.location.href = "/";
+    } catch (err: any) {
+      console.error("Account deletion failed:", err);
+      alert(err.message || "Account deletion failed. Please try again.");
+      setDeleting(false);
+    }
+  }
+
   return (
     <nav className="border-b border-gray-100 bg-white sticky top-0 z-40">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -74,6 +121,14 @@ export default function Navbar() {
               )}
               <button type="button" onClick={signOut} className="text-gray-400 hover:text-gray-700">
                 Sign out
+              </button>
+              <button
+                type="button"
+                onClick={deleteAccount}
+                disabled={deleting}
+                className="text-xs text-alert-500 hover:underline"
+              >
+                {deleting ? "Deleting..." : "Delete Account"}
               </button>
             </>
           ) : (

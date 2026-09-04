@@ -40,6 +40,7 @@ service cloud.firestore {
         (isAdmin() ||
           (request.auth.uid == userId &&
            request.resource.data.isAdmin == resource.data.isAdmin));
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     // ---------------------------------------------------------
@@ -91,22 +92,24 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------
-    // ACTIVITY LOG — users can read their own logs; any signed-in
+    // ACTIVITY LOG — users can read/delete their own logs; any signed-in
     // user can create logs (client-side writes are best-effort).
     // ---------------------------------------------------------
     match /activityLog/{logId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // ---------------------------------------------------------
-    // NOTIFICATIONS — users can read their own notifications; any
+    // NOTIFICATIONS — users can read/delete their own notifications; any
     // signed-in user can create notifications.
     // ---------------------------------------------------------
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // ---------------------------------------------------------
