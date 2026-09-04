@@ -52,13 +52,16 @@ export default function NewPetPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
       setCameraStream(stream);
       setCameraOpen(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
     } catch (err: any) {
       setCameraError(err.message || "Camera not available.");
     }
   }
+
+  useEffect(() => {
+    if (cameraOpen && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraOpen, cameraStream]);
 
   function stopCamera() {
     if (cameraStream) {
