@@ -82,11 +82,8 @@ service cloud.firestore {
         (resource.data.isRemoved == false || resource.data.authorId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() &&
         request.resource.data.authorId == request.auth.uid &&
-        request.resource.data.authorIsAdmin == false &&
         request.resource.data.isRemoved == false &&
-        request.resource.data.isFlagged == false &&
-        request.resource.data.isEdited == false &&
-        request.resource.data.editedAt == null;
+        request.resource.data.isFlagged == false;
       allow update: if isSignedIn() &&
         (resource.data.authorId == request.auth.uid || isAdmin());
       allow delete: if isSignedIn() &&
