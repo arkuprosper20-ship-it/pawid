@@ -108,6 +108,9 @@ export default function Navbar() {
           🐾 PawID
         </Link>
         <div className="flex items-center gap-3 sm:gap-4 text-sm">
+          <Link href="/map" className="hover:text-brand-600">
+            Lost Pets
+          </Link>
           <Link href="/community" className="hover:text-brand-600">
             Community
           </Link>

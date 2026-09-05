@@ -17,17 +17,40 @@ export default function LostModeToggle({
   const [loading, setLoading] = useState(false);
   const [rewardNote, setRewardNote] = useState(pet.rewardNote ?? "");
   const [lastSeen, setLastSeen] = useState(pet.lastSeenLocation ?? "");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    pet.lastSeenLat != null && pet.lastSeenLng != null
+      ? { lat: pet.lastSeenLat, lng: pet.lastSeenLng }
+      : null
+  );
+  const [locating, setLocating] = useState(false);
   const isLost = pet.status === "lost";
+
+  function captureLocation() {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocating(false);
+      },
+      () => {
+        setLocating(false);
+      },
+      { timeout: 8000 }
+    );
+  }
 
   async function toggleLost() {
     setLoading(true);
     const nextStatus: Pet["status"] = isLost ? "normal" : "lost";
 
-    const updates = {
+    const updates: Record<string, unknown> = {
       status: nextStatus,
       lostSince: nextStatus === "lost" ? new Date().toISOString() : null,
       rewardNote: nextStatus === "lost" ? rewardNote : pet.rewardNote,
       lastSeenLocation: nextStatus === "lost" ? lastSeen : pet.lastSeenLocation,
+      lastSeenLat: nextStatus === "lost" ? coords?.lat ?? null : pet.lastSeenLat,
+      lastSeenLng: nextStatus === "lost" ? coords?.lng ?? null : pet.lastSeenLng,
       updatedAt: serverTimestamp(),
     };
 
@@ -38,6 +61,8 @@ export default function LostModeToggle({
       lostSince: updates.lostSince as string | null,
       rewardNote: updates.rewardNote as string | null,
       lastSeenLocation: updates.lastSeenLocation as string | null,
+      lastSeenLat: updates.lastSeenLat as number | null,
+      lastSeenLng: updates.lastSeenLng as number | null,
     });
 
     await logActivity({
@@ -85,11 +110,30 @@ export default function LostModeToggle({
       {!isLost && (
         <div className="space-y-2">
           <input
-            placeholder="Last seen location (optional)"
+            placeholder="Last seen location (e.g. 'Oak Park, Chicago')"
             className="input-field text-sm"
             value={lastSeen}
             onChange={(e) => setLastSeen(e.target.value)}
           />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={captureLocation}
+              disabled={locating}
+              className="text-xs text-brand-700 hover:underline disabled:text-gray-400"
+            >
+              {locating
+                ? "Locating..."
+                : coords
+                ? "📍 Use current location"
+                : "📍 Pin current location on map"}
+            </button>
+            {coords && (
+              <span className="text-xs text-gray-400">
+                {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+              </span>
+            )}
+          </div>
           <input
             placeholder="Reward note (optional)"
             className="input-field text-sm"
@@ -102,7 +146,8 @@ export default function LostModeToggle({
       {isLost && (
         <p className="text-sm text-gray-600">
           The public QR page now shows an urgent alert with your emergency
-          contact and reward note. A community alert has been broadcast.
+          contact, reward note, and map pin. A community alert has been
+          broadcast.
         </p>
       )}
     </div>

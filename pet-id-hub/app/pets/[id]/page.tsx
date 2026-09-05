@@ -7,6 +7,7 @@ import {
   getDoc,
   collection,
   addDoc,
+  onSnapshot,
   serverTimestamp,
   query,
   where,
@@ -14,8 +15,10 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Pet } from "@/types";
+import { Pet, Partner } from "@/types";
 import { BadgeList } from "@/components/BadgeList";
+import MapPin from "@/components/MapPin";
+import { createNotification } from "@/lib/notifications";
 
 export default function PublicPetPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,29 +30,32 @@ export default function PublicPetPage() {
   const [otherLostPets, setOtherLostPets] = useState<Pet[]>([]);
   const [showCompare, setShowCompare] = useState(false);
   const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
+  const [partners, setPartners] = useState<Partner[]>([]);
 
   useEffect(() => {
-    load();
-  }, [id]);
-
-  async function load() {
-    try {
-      const snap = await getDoc(doc(db, "pets", id));
+    // Realtime pet doc — Lost Mode toggle updates land without reload.
+    const unsubPet = onSnapshot(doc(db, "pets", id), (snap) => {
       if (snap.exists()) setPet({ id: snap.id, ...snap.data() } as Pet);
+      setLoading(false);
+    }, (err) => {
+      console.error("Pet listener error:", err);
+      setLoading(false);
+    });
 
-      // Log the scan (fire and forget) — anonymous writes allowed by security rules
-      try {
-        addDoc(collection(db, "qrScans"), {
-          petId: id,
-          scannedAt: serverTimestamp(),
-          finderMessage: null,
-          finderContact: null,
-          finderLat: null,
-          finderLng: null,
-        });
-      } catch {}
+    // Log the scan (fire and forget) — anonymous writes allowed by security rules
+    try {
+      addDoc(collection(db, "qrScans"), {
+        petId: id,
+        scannedAt: serverTimestamp(),
+        finderMessage: null,
+        finderContact: null,
+        finderLat: null,
+        finderLng: null,
+      });
+    } catch {}
 
-      // For the manual comparison tool: other currently-lost pets (MVP: all lost pets)
+    // Other currently-lost pets for the manual compare tool
+    (async () => {
       try {
         const q = query(collection(db, "pets"), where("status", "==", "lost"), limit(12));
         const lostSnap = await getDocs(q);
@@ -59,12 +65,18 @@ export default function PublicPetPage() {
             .filter((p) => p.id !== id)
         );
       } catch {}
-    } catch (err) {
-      console.error("Failed to load pet details:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
+    })();
+
+    // Partners (shelters + vets) — public read for everyone
+    const unsubPartners = onSnapshot(query(collection(db, "partners"), limit(50)), (snap) => {
+      setPartners(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Partner)));
+    }, () => {});
+
+    return () => {
+      unsubPet();
+      unsubPartners();
+    };
+  }, [id]);
 
   async function sendFinderMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -89,6 +101,28 @@ export default function PublicPetPage() {
       finderLat: lat,
       finderLng: lng,
     });
+
+    // Notify the owner that their pet may have been found. Finders are often
+    // anonymous, so this write is allowed by the Firestore rule for
+    // `type == "pet_found"` notifications (see firebase/firestore.rules).
+    if (pet) {
+      await createNotification({
+        userId: pet.ownerId,
+        type: "pet_found",
+        message: [
+          `Your pet ${pet.name} was just reported found!`,
+          finderMsg.trim() ? `Message: ${finderMsg.trim()}` : null,
+          finderContact.trim() ? `Contact: ${finderContact.trim()}` : null,
+          lat != null && lng != null
+            ? `Location: https://www.google.com/maps?q=${lat},${lng}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        petId: id,
+      });
+    }
+
     setSent(true);
   }
 
@@ -104,6 +138,14 @@ export default function PublicPetPage() {
 
   const isLost = pet.status === "lost";
 
+  // Filter partners by pet owner's city (best-effort) — fall back to first 3.
+  const nearbyPartners = pet && partners.length > 0
+    ? partners
+        .filter((p) => !pet.lastSeenLocation || !p.city || p.city && pet.lastSeenLocation.toLowerCase().includes(p.city.toLowerCase()))
+        .slice(0, 3)
+    : [];
+  const fallbackPartners = partners.slice(0, 3);
+
   return (
     <div className="max-w-md mx-auto">
       {isLost && (
@@ -113,10 +155,17 @@ export default function PublicPetPage() {
       )}
 
       <div className="card text-center">
-        <div className="w-28 h-28 rounded-full bg-gray-100 mx-auto overflow-hidden flex items-center justify-center text-4xl mb-3">
+        <div
+          className="w-full h-48 rounded-xl bg-gray-100 mx-auto overflow-hidden flex items-center justify-center text-6xl mb-3"
+          style={{ aspectRatio: "1/1", maxHeight: "220px" }}
+        >
           {pet.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={pet.photoUrl} alt={pet.name} className="w-full h-full object-cover" />
+            <img
+              src={pet.photoUrl}
+              alt={pet.name}
+              className="w-full h-full object-cover"
+            />
           ) : (
             "🐾"
           )}
@@ -139,8 +188,14 @@ export default function PublicPetPage() {
               <strong>Last seen:</strong> {pet.lastSeenLocation}
             </p>
           )}
+          <MapPin
+            lat={pet.lastSeenLat ?? null}
+            lng={pet.lastSeenLng ?? null}
+            fallbackQuery={pet.lastSeenLocation}
+            label="Map of last-seen area"
+          />
           {pet.rewardNote && (
-            <p className="text-sm mb-1">
+            <p className="text-sm mb-1 mt-2">
               <strong>Reward:</strong> {pet.rewardNote}
             </p>
           )}
@@ -185,6 +240,33 @@ export default function PublicPetPage() {
         <div className="card mt-4">
           <h2 className="font-semibold mb-1 text-sm">Medical notes</h2>
           <p className="text-sm text-gray-600">{pet.medicalNotes}</p>
+        </div>
+      )}
+
+      {/* Nearby shelters/vets — lightweight partnership directory */}
+      {(nearbyPartners.length > 0 || fallbackPartners.length > 0) && (
+        <div className="card mt-4">
+          <h2 className="font-semibold mb-2 text-sm">
+            🏥 Nearby shelters & vets
+            <span className="text-xs text-gray-400 font-normal ml-1">(partners)</span>
+          </h2>
+          <div className="space-y-2">
+            {(nearbyPartners.length > 0 ? nearbyPartners : fallbackPartners).map((p) => (
+              <div key={p.id} className="text-sm border-b border-gray-50 pb-2 last:border-0">
+                <p className="font-medium">
+                  {p.name}
+                  <span className="ml-2 text-xs text-gray-400 capitalize">({p.type})</span>
+                </p>
+                {p.address && <p className="text-xs text-gray-500">{p.address}</p>}
+                {p.city && <p className="text-xs text-gray-400">{p.city}</p>}
+                {p.phone && (
+                  <a href={`tel:${p.phone}`} className="text-xs text-brand-700 hover:underline">
+                    📞 {p.phone}
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

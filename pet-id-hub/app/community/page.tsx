@@ -1,78 +1,132 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   collection,
   query,
   where,
   orderBy,
   limit,
+  startAfter,
   getDocs,
   addDoc,
   updateDoc,
   deleteDoc,
   doc,
   getDoc,
+  onSnapshot,
   serverTimestamp,
+  DocumentData,
+  QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { auth, db, toJsDate } from "@/lib/firebase";
 import { CommunityPost, BroadcastAlert, Profile } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 
+const PAGE_SIZE = 10;
+
 export default function CommunityPage() {
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [pages, setPages] = useState<CommunityPost[][]>([]);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
   const [content, setContent] = useState("");
-  const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [alerts, setAlerts] = useState<BroadcastAlert[]>([]);
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const [currentUid, setCurrentUid] = useState<string | null>(null);
   const [currentIsAdmin, setCurrentIsAdmin] = useState(false);
+  const [currentCity, setCurrentCity] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [nearbyOnly, setNearbyOnly] = useState(false);
+
+  const lastDocRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged((u) => {
+    const unsub = auth.onAuthStateChanged(async (u) => {
       setCurrentUid(u?.uid || null);
       if (u) {
-        getDoc(doc(db, "profiles", u.uid)).then((snap) => {
+        try {
+          const snap = await getDoc(doc(db, "profiles", u.uid));
           if (snap.exists()) {
-            setCurrentIsAdmin((snap.data() as Profile).isAdmin === true);
+            const p = snap.data() as Profile;
+            setCurrentIsAdmin(p.isAdmin === true);
+            setCurrentCity(p.city || null);
           } else {
             setCurrentIsAdmin(false);
+            setCurrentCity(null);
           }
-        }).catch(() => setCurrentIsAdmin(false));
+        } catch {
+          setCurrentIsAdmin(false);
+          setCurrentCity(null);
+        }
       } else {
         setCurrentIsAdmin(false);
+        setCurrentCity(null);
       }
     });
-    load();
     return () => unsub();
   }, []);
 
-  async function load() {
+  // Realtime broadcast alerts (top of page)
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "broadcastAlerts"), orderBy("createdAt", "desc"), limit(5)),
+      (snap) => setAlerts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BroadcastAlert))),
+      () => {}
+    );
+    return () => unsub();
+  }, []);
+
+  // First page + realtime prepend on new posts
+  useEffect(() => {
+    const q = query(
+      collection(db, "communityPosts"),
+      where("isRemoved", "==", false),
+      orderBy("createdAt", "desc"),
+      limit(PAGE_SIZE)
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as CommunityPost));
+      setPages([docs]);
+      lastDocRef.current = snap.docs[snap.docs.length - 1] ?? null;
+      setCursor(lastDocRef.current);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setInitialLoading(false);
+    }, (err) => {
+      console.error("Feed listener error:", err);
+      setInitialLoading(false);
+    });
+
+    return () => unsub();
+  }, []);
+
+  async function loadMore() {
+    if (!cursor || !hasMore || loadingMore) return;
+    setLoadingMore(true);
     try {
-      const postsQ = query(
+      const q = query(
         collection(db, "communityPosts"),
         where("isRemoved", "==", false),
         orderBy("createdAt", "desc"),
-        limit(50)
+        startAfter(cursor),
+        limit(PAGE_SIZE)
       );
-      const postsSnap = await getDocs(postsQ);
-      const postsList = postsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as CommunityPost));
-      setPosts(postsList);
-
-      const alertsQ = query(
-        collection(db, "broadcastAlerts"),
-        orderBy("createdAt", "desc"),
-        limit(10)
-      );
-      const alertsSnap = await getDocs(alertsQ);
-      setAlerts(alertsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as BroadcastAlert)));
+      const snap = await getDocs(q);
+      const newPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as CommunityPost));
+      setPages((prev) => [...prev, newPosts]);
+      const last = snap.docs[snap.docs.length - 1];
+      setCursor(last ?? null);
+      lastDocRef.current = last ?? null;
+      setHasMore(snap.docs.length === PAGE_SIZE);
     } catch (err) {
-      console.error("Failed to load community feed:", err);
+      console.error("Load more failed:", err);
     } finally {
-      setLoading(false);
+      setLoadingMore(false);
     }
   }
 
@@ -91,6 +145,7 @@ export default function CommunityPage() {
       let authorName: string | null = null;
       let authorUsername: string | null = null;
       let isAdmin = false;
+      let authorCity: string | null = null;
       try {
         const profileSnap = await getDoc(doc(db, "profiles", user.uid));
         if (profileSnap.exists()) {
@@ -98,6 +153,7 @@ export default function CommunityPage() {
           authorName = p.fullName || null;
           authorUsername = p.username || null;
           isAdmin = p.isAdmin === true;
+          authorCity = p.city || null;
         }
       } catch (profileErr) {
         console.warn("Could not fetch profile, using fallback:", profileErr);
@@ -108,6 +164,7 @@ export default function CommunityPage() {
         authorName,
         authorUsername,
         authorIsAdmin: isAdmin,
+        authorCity,
         petId: null,
         content: content.trim(),
         photoUrl: null,
@@ -118,7 +175,6 @@ export default function CommunityPage() {
         createdAt: serverTimestamp(),
       });
       setContent("");
-      await load();
     } catch (err: any) {
       console.error("Failed to post:", err);
       setReportStatus(err.message || "Could not publish post. Please try again.");
@@ -131,7 +187,6 @@ export default function CommunityPage() {
     try {
       await updateDoc(doc(db, "communityPosts", postId), { isFlagged: true });
       setReportStatus("Post reported for review.");
-      await load();
     } catch (err: any) {
       setReportStatus(err.message || "Could not report this post. Try again.");
     }
@@ -148,11 +203,9 @@ export default function CommunityPage() {
     if (!ok) return;
     try {
       await deleteDoc(doc(db, "communityPosts", post.id));
-      await load();
       setReportStatus("Post deleted.");
     } catch (err: any) {
       setReportStatus(err.message || "Could not delete this post.");
-      await load();
     }
   }
 
@@ -180,7 +233,6 @@ export default function CommunityPage() {
       });
       setEditingId(null);
       setEditContent("");
-      await load();
     } catch (err: any) {
       setReportStatus(err.message || "Could not save changes.");
     }
@@ -197,6 +249,11 @@ export default function CommunityPage() {
     if (!currentUid) return false;
     return post.authorId === currentUid || currentIsAdmin;
   }
+
+  const allPosts = pages.flat();
+  const visiblePosts = nearbyOnly && currentCity
+    ? allPosts.filter((p) => p.authorCity && p.authorCity.toLowerCase() === currentCity.toLowerCase())
+    : allPosts;
 
   return (
     <div className="max-w-xl mx-auto">
@@ -222,20 +279,33 @@ export default function CommunityPage() {
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />
-        <button type="submit" disabled={posting} className="btn-primary text-sm mt-2">
-          {posting ? "Posting..." : "Post"}
-        </button>
+        <div className="flex items-center justify-between">
+          <button type="submit" disabled={posting} className="btn-primary text-sm">
+            {posting ? "Posting..." : "Post"}
+          </button>
+          {currentCity && (
+            <label className="text-xs text-gray-500 flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={nearbyOnly}
+                onChange={(e) => setNearbyOnly(e.target.checked)}
+                className="accent-brand-600"
+              />
+              Nearby ({currentCity})
+            </label>
+          )}
+        </div>
       </form>
 
       {reportStatus && (
         <p role="status" className="text-sm text-brand-700 mb-4">{reportStatus}</p>
       )}
 
-      {loading ? (
+      {initialLoading ? (
         <p className="text-gray-400">Loading feed...</p>
       ) : (
         <div className="space-y-4">
-          {posts.map((post) => {
+          {visiblePosts.map((post) => {
             const canAct = canModify(post);
             return (
               <div key={post.id} className="card">
@@ -246,6 +316,9 @@ export default function CommunityPage() {
                       <span className="ml-2 text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">
                         Management
                       </span>
+                    )}
+                    {post.authorCity && (
+                      <span className="ml-2 text-xs text-gray-400">📍 {post.authorCity}</span>
                     )}
                   </span>
                   <span className="text-xs text-gray-400">
@@ -314,8 +387,22 @@ export default function CommunityPage() {
               </div>
             );
           })}
-          {posts.length === 0 && (
-            <p className="text-gray-400 text-center py-8">No posts yet — be the first!</p>
+          {visiblePosts.length === 0 && (
+            <p className="text-gray-400 text-center py-8">
+              {nearbyOnly ? "No posts nearby yet." : "No posts yet — be the first!"}
+            </p>
+          )}
+
+          {!nearbyOnly && hasMore && (
+            <div className="text-center">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="btn-secondary text-sm"
+              >
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
           )}
         </div>
       )}

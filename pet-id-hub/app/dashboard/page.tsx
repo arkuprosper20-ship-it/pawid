@@ -122,6 +122,10 @@ export default function DashboardPage() {
       setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)));
     }
     setShowNotifications(false);
+    // Take the owner straight to the pet so they can act on a "pet found" alert.
+    if (notif.petId) {
+      window.location.href = `/dashboard/pets/${notif.petId}`;
+    }
   }
 
   const unreadCount = notifications.filter((n) => !n.read).length;

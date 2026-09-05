@@ -26,6 +26,9 @@ export interface Pet {
   lostSince: string | null;
   rewardNote: string | null;
   lastSeenLocation: string | null;
+  /** Owner-reported lat/lng of last-seen location (used for map pin). */
+  lastSeenLat: number | null;
+  lastSeenLng: number | null;
   badges: string[];
   previousOwnerIds: string[];
   createdAt: string;
@@ -50,6 +53,8 @@ export interface CommunityPost {
   /** Username shown publicly (admins render as "Management"). Never an email. */
   authorUsername: string | null;
   authorIsAdmin: boolean;
+  /** Author's city at time of posting — powers the "nearby" filter. */
+  authorCity: string | null;
   petId: string | null;
   content: string;
   photoUrl: string | null;
@@ -69,6 +74,20 @@ export interface Profile {
   phone: string | null;
   isAdmin: boolean;
   petIds: string[];
+  createdAt: string;
+}
+
+export interface Partner {
+  id: string;
+  /** "shelter" or "vet" */
+  type: "shelter" | "vet";
+  name: string;
+  city: string | null;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  lat: number | null;
+  lng: number | null;
   createdAt: string;
 }
 

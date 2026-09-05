@@ -39,6 +39,8 @@ status: "normal" | "lost"
 lostSince: string | null       // ISO timestamp
 rewardNote: string | null
 lastSeenLocation: string | null
+lastSeenLat: number | null     // owner-reported last-seen latitude (map pin)
+lastSeenLng: number | null     // owner-reported last-seen longitude (map pin)
 badges: string[]         // e.g. ["Vaccinated", "Friendly"] — an array field,
                           // not a join table, since Firestore has no joins
 createdAt: Timestamp
@@ -84,6 +86,16 @@ petId: string | null
 message: string
 triggeredBy: string | null   // uid, null for auto-fired Lost Mode alerts
 isManual: boolean
+createdAt: Timestamp
+```
+
+### `notifications/{notificationId}`
+```
+userId: string               // uid of the recipient (the pet owner)
+type: "pet_found" | "broadcast" | "system"
+message: string
+petId: string | null         // set for pet_found alerts so the owner can jump to the pet
+read: boolean
 createdAt: Timestamp
 ```
 

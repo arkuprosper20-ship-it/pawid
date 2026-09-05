@@ -19,7 +19,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db, toJsDate } from "@/lib/firebase";
-import { Pet, CommunityPost, BroadcastAlert } from "@/types";
+import { Pet, CommunityPost, BroadcastAlert, Partner } from "@/types";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -27,6 +27,7 @@ export default function AdminPage() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [alerts, setAlerts] = useState<BroadcastAlert[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [stats, setStats] = useState({
     totalPets: 0,
     lostPets: 0,
