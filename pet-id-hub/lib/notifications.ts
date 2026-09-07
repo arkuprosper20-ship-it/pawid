@@ -31,12 +31,16 @@ export async function getUserNotifications(userId: string, limitCount = 20) {
   try {
     const q = query(
       collection(db, "notifications"),
-      where("userId", "==", userId),
-      orderBy("createdAt", "desc"),
-      limit(limitCount)
+      where("userId", "==", userId)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Notification));
+    const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification);
+    list.sort((a, b) => {
+      const tA = (a.createdAt as any)?.toDate?.()?.getTime() || 0;
+      const tB = (b.createdAt as any)?.toDate?.()?.getTime() || 0;
+      return tB - tA;
+    });
+    return list.slice(0, limitCount);
   } catch (err) {
     console.warn("Failed to fetch notifications:", err);
     return [];

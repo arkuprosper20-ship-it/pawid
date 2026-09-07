@@ -80,6 +80,12 @@ export default function LostModeToggle({
         isManual: false,
         createdAt: serverTimestamp(),
       });
+      await createNotification({
+        userId: pet.ownerId,
+        type: "lost_mode",
+        message: `🚨 Lost mode activated for ${pet.name}. A community alert has been broadcasted.`,
+        petId: pet.id,
+      });
     } else {
       await createNotification({
         userId: pet.ownerId,

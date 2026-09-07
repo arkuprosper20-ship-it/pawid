@@ -31,6 +31,7 @@ export default function PublicPetPage() {
   const [showCompare, setShowCompare] = useState(false);
   const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     // Realtime pet doc — Lost Mode toggle updates land without reload.
@@ -159,12 +160,13 @@ export default function PublicPetPage() {
           className="w-full h-48 rounded-xl bg-gray-100 mx-auto overflow-hidden flex items-center justify-center text-6xl mb-3"
           style={{ aspectRatio: "1/1", maxHeight: "220px" }}
         >
-          {pet.photoUrl ? (
+          {pet.photoUrl && !imgError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={pet.photoUrl}
               alt={pet.name}
               className="w-full h-full object-cover"
+              onError={() => setImgError(true)}
             />
           ) : (
             "🐾"

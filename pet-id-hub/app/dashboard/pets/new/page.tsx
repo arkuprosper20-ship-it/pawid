@@ -6,6 +6,7 @@ import { signInAnonymously } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { logActivity, addPetIdToProfile } from "@/lib/activityLog";
+import { createNotification } from "@/lib/notifications";
 
 const BREED_OPTIONS: Record<string, string[]> = {
   Dog: ["Labrador", "German Shepherd", "Golden Retriever", "Bulldog", "Poodle", "Rottweiler", "Beagle", "Dachshund", "Siberian Husky", "Great Dane", "Doberman", "Boxer", "Chihuahua", "Shih Tzu", "Pomeranian", "Corgi", "Border Collie", "Australian Shepherd", "Jack Russell", "Pit Bull", "Mixed"],
@@ -180,6 +181,12 @@ export default function NewPetPage() {
           metadata: { petName: form.name, species },
         }),
         addPetIdToProfile(userId, petId),
+        createNotification({
+          userId,
+          type: "general",
+          message: `Welcome ${form.name}! Your pet profile and QR tag have been created.`,
+          petId,
+        }),
       ]);
 
       try {
@@ -272,13 +279,21 @@ export default function NewPetPage() {
           onChange={(e) => update("ageYears", e.target.value)}
         />
         <div>
-          <label className="text-sm text-gray-500 mb-1 block">Photo</label>
+          <label className="text-sm text-gray-500 mb-1 block">Pet Photo</label>
+          <input
+            type="url"
+            aria-label="Pet photo URL"
+            placeholder="Paste image URL (https://...) or upload/capture below"
+            className="input-field mb-2"
+            value={photoPreview?.startsWith("data:") ? "" : (photoPreview || "")}
+            onChange={(e) => setPhotoPreview(e.target.value.trim() || null)}
+          />
           <div className="flex gap-2">
             <input
               type="file"
               accept="image/*"
               capture="environment"
-              aria-label="Pet photo"
+              aria-label="Pet photo file upload"
               onChange={handlePhotoChange}
               className="text-sm flex-1"
             />
@@ -291,12 +306,19 @@ export default function NewPetPage() {
             </button>
           </div>
           {photoPreview && (
-            <div className="mt-2">
+            <div className="mt-2 relative">
               <img
                 src={photoPreview}
                 alt="Selected pet photo preview"
                 className="w-full max-h-48 object-cover rounded-lg border border-gray-200"
               />
+              <button
+                type="button"
+                onClick={() => setPhotoPreview(null)}
+                className="absolute top-2 right-2 bg-gray-800/80 hover:bg-gray-900 text-white rounded-md px-2 py-0.5 text-xs"
+              >
+                ✕ Clear photo
+              </button>
             </div>
           )}
           {cameraOpen && (

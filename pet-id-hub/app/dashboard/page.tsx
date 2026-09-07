@@ -28,9 +28,25 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
   async function loadNotifications(uid: string) {
     const notifs = await getUserNotifications(uid, 10);
     setNotifications(notifs);
+    const unread = notifs.filter((n) => !n.read);
+    if (unread.length > 0 && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      const latest = unread[0];
+      try {
+        new Notification("🐾 PawID Alert", {
+          body: latest.message,
+          icon: "/favicon.ico",
+        });
+      } catch {}
+    }
   }
 
   async function transferOwnership(uid: string, email: string | null | undefined, petId: string, currentOwnerId: string) {
