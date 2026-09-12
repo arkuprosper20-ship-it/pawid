@@ -7,3 +7,5 @@ npm-debug.log*
 serviceAccountKey.json
 firebase-debug.log
 .vercel
+
+.sixth/agents
